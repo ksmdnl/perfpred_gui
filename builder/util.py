@@ -111,14 +111,3 @@ if __name__ == "__main__":
     model = model.to(device)
     model.eval()
     inference(model)
-    # sample = cv2.imread('samples/munich_000068_000019_leftImg8bit.png')
-    # sample = cv2.resize(sample, (WIDTH, HEIGHT))
-    # tensor = preprocess(sample).unsqueeze(0)
-    # with torch.no_grad():
-    #     out = model(tensor)["image_reconstruction"]
-    #     out = (out * std) + mean
-    #     # tensor = (tensor * std) + mean
-    #     print(get_psnr(tensor, out))
-    #     out = out.squeeze(0).permute(1,2,0).cpu().numpy()
-    # plt.imshow(tensor.squeeze(0).permute(1,2,0).cpu().numpy())
-    # plt.show()
