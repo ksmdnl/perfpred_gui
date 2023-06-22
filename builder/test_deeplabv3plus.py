@@ -14,14 +14,14 @@ from PerfPredRecV2.models.wrapper import load_model_def
 
 trainid2label = dataset_labels['cityscapes'].gettrainid2label()
 
+HEIGHT, WIDTH = 150, 500
+
 preprocess = transforms.Compose([
     transforms.ToPILImage(),
-    transforms.Resize((768, 768)),
-    # transforms.Resize((1024, 2048)),
+    transforms.Resize((HEIGHT, WIDTH)),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
 )
-HEIGHT, WIDTH = 1024, 2048
 
 def play():
     file = "videos/tbilisi.mov"
@@ -52,7 +52,7 @@ def single_frame(model):
     sample = cv2.imread(sample)
     sample = cv2.cvtColor(sample, cv2.COLOR_BGR2RGB)
     sample_tensor = preprocess(sample).unsqueeze(0)
-    output = model(sample_tensor)
+    output = model(sample_tensor)["out"]
     _, predicted = torch.max(output, 1)
     predicted = predicted.squeeze().cpu().numpy()
     mask = colorize(predicted).numpy() / 255.
@@ -70,22 +70,26 @@ def inference(model):
             ret, frame = cap.read()
             if not ret:
                 break
-            frame = cv2.resize(frame, (HEIGHT, WIDTH)) 
             # Preprocess the frame
+            frame = cv2.resize(frame, (WIDTH, HEIGHT)) 
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             input_tensor = preprocess(frame).unsqueeze(0)
+            print(input_tensor.shape)
             
             # Perform inference
-            output = model(input_tensor)
+            output = model(input_tensor)["out"]
             _, predicted = torch.max(output, 1)
             predicted = predicted.squeeze().cpu().numpy()
 
-            # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             # Step 6: Visualize or Save the Results
             # Example: Display the segmentation mask on the frame
-            mask = colorize(predicted).numpy() / 255.
+            mask = predicted.astype('uint8') * (255 // 19)  # Normalize mask values for visualization
             # mask = cv2.resize(mask, (frame.shape[1], frame.shape[0]), interpolation=cv2.INTER_NEAREST)
-            cv2.imshow("Semantic Segmentation", mask)
+            # mask = colorize(predicted).numpy() / 255.
+            overlay = cv2.addWeighted(frame, 0.6, cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR), 0.4, 0)
+            print(mask.shape, predicted.shape)
+            cv2.imshow("Semantic Segmentation", overlay)
             
             # Press 'q' to exit
             if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -95,16 +99,10 @@ def inference(model):
 
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # play()
-    model_name = "SwiftNet"
     num_classes = 19
-    backbone = "resnet18"
-    model = load_model_def(model_name, num_classes)
-    weightspath = os.path.join("weights", model_name.lower(), backbone, 'model.pth')
-    assert os.path.exists(weightspath), f"{weightspath} does not exists."
-    model.load_state_dict(torch.load(weightspath, map_location=device))
-
+    model = models.segmentation.deeplabv3_resnet50(pretrained=True)
+    # model.classifier[-1] = torch.nn.Conv2d(256, 19, kernel_size=(1, 1))
     model = model.to(device)
     model.eval()
     inference(model)
-    #single_frame(model)
+    # single_frame(model)
