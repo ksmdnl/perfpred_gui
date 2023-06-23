@@ -90,7 +90,6 @@ def inference(model):
             cv2.moveWindow("Segmentation", 0, 400)
             cv2.imshow("Segmentation", mask)
             
-            # Press 'q' to exit
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
