@@ -8,7 +8,8 @@ import cv2
 import sys
 import os
 from dataloader.definitions.labels_file import *
-# FIXME: this is ugly
+
+# TODO: this is ugly
 sys.path.append("../")
 from PerfPredRecV2.models.wrapper import load_model_def
 
@@ -26,6 +27,11 @@ preprocess = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
 )
+
+reg_coeff = np.array([0.09334191 -0.6773528  -9.46617536])
+
+def get_miou_estimate(psnr):
+    return 0.09334191 * (psnr**2) - 0.6773528 * psnr - 9.46617536
 
 def colorize(tensor, num_classes=18):
     new_tensor = torch.zeros((tensor.shape[0], tensor.shape[1], 3), dtype=torch.uint8)
@@ -73,7 +79,6 @@ def inference(model):
                 break
             frame = cv2.resize(frame, (WIDTH, HEIGHT)) 
             # Preprocess the frame
-            # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             input_tensor = preprocess(frame).unsqueeze(0)
             
             # Perform inference
@@ -83,7 +88,9 @@ def inference(model):
             reconstructed = output[1]
 
             input_tensor = denormalize(input_tensor)
-            print(f"PSNR: {get_psnr(input_tensor, reconstructed)} dB")
+            psnr = get_psnr(input_tensor, reconstructed)
+            print(f"PSNR: {psnr} dB")
+            print(f"mIoU estimate: {get_miou_estimate(psnr)} %")
             cv2.imshow("Reconstruction", reconstructed)
             cv2.moveWindow("Reconstruction", 0, 200)
             cv2.imshow("Ground truth", frame)
