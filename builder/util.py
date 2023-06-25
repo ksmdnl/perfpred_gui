@@ -111,7 +111,7 @@ def inference(model):
     cap.release()
     cv2.destroyAllWindows()
 
-def single_frame(model, sample="samples/munich_000068_000019_leftImg8bit.png", inference=False):
+def single_frame(model=None, sample="samples/munich_000068_000019_leftImg8bit.png", inference=False):
     sample = cv2.imread(sample)
     sample = cv2.cvtColor(sample, cv2.COLOR_BGR2RGB)
     sample_tensor = preprocess(sample).unsqueeze(0)
@@ -197,7 +197,8 @@ if __name__ == "__main__":
     # inference(model)
     model = ModelWrapper(model, postprocessing=remove_rec_output)
     attack = generate_attack(10 / 255, model, attack_type="metzen", iterations=1)
-    sample = single_frame(model, sample=attack, inference=False)
+    sample = single_frame(inference=False)
+    sample = denormalize(sample)
     out_attack, _ = attack.generate(sample)
     out_attack = denormalize(out_attack)
     cv2.imshow("Attacked image", out_attack)
