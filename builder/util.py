@@ -4,10 +4,12 @@ import matplotlib.pyplot as plt
 import torch
 import torchvision.transforms as transforms
 import torchvision.models as models
+import torch.nn as nn
 import cv2
 import sys
 import os
 from dataloader.definitions.labels_file import *
+from attack import Attack
 
 # TODO: this is ugly
 sys.path.append("../")
@@ -20,7 +22,7 @@ STD = [0.229, 0.224, 0.225]
 mean = torch.tensor(MEAN).reshape(1, -1, 1, 1)
 std = torch.tensor(STD).reshape(1, -1, 1, 1)
 
-HEIGHT, WIDTH = 150, 500
+HEIGHT, WIDTH = 1024, 2048
 preprocess = transforms.Compose([
     transforms.ToPILImage(),
     transforms.Resize((HEIGHT, WIDTH)),
@@ -51,6 +53,12 @@ def postprocess(output):
     rec_image = output["image_reconstruction"]
     rec_image = denormalize(rec_image)
     return (mask, rec_image)
+
+def generate_attack(epsilon, model, attack_type="fgsm", iterations=40):
+    return Attack(epsilon, model, type=attack_type, iterations=iterations)
+
+def apply(var, obj):
+    return obj(var)
 
 def get_psnr(img, gen_img):
     # Compute MSE first
@@ -103,6 +111,76 @@ def inference(model):
     cap.release()
     cv2.destroyAllWindows()
 
+def single_frame(model, sample="samples/munich_000068_000019_leftImg8bit.png", inference=False):
+    sample = cv2.imread(sample)
+    sample = cv2.cvtColor(sample, cv2.COLOR_BGR2RGB)
+    sample_tensor = preprocess(sample).unsqueeze(0)
+    if inference:
+        output = model(sample_tensor)["out"]
+        _, predicted = torch.max(output, 1)
+        predicted = predicted.squeeze().cpu().numpy()
+        mask = colorize(predicted).numpy() / 255.
+        cv2.imshow("Semantic Segmentation", mask)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+    else:
+        return sample_tensor
+
+class ModelWrapper(nn.Module):
+    """
+    A class to wrap a model with a preprocess function as well as a postprocess function.
+    """
+    def __init__(self, model, preprocessing=None, postprocessing=None) -> None:
+        """
+        :param model: The model to be wrapped
+        :param preprocess: A callable preprocess function
+        :param postprocess: A callable postprocess function
+        """
+
+        super().__init__()
+
+        # Initialization
+        self.model = model
+        self.preprocessing = preprocessing
+        self.postprocessing = postprocessing
+        self.device = next(model.parameters()).device
+
+    def _preprocess(self, x):
+        """
+        A function to perform preprocessing on the model input.
+
+        :param x: Input image to the model.
+        :return: Preprocessed image
+        """
+        if self.preprocessing is None:
+            return x
+        else:
+            return self.preprocessing(x)
+
+    def _postprocess(self, y):
+        """
+        A function to perform postprocessing on the model output.
+
+        :param y: Output of the model.
+        :return: Postprocessed output
+        """
+        if self.postprocessing is None:
+            return y
+        else:
+            return self.postprocessing(y)
+
+    def forward(self, x):
+        x = self._preprocess(x)
+        y = self.model(x)
+        return self._postprocess(y)
+
+
+def remove_rec_output(x):
+    assert isinstance(x, dict), "x is not a dictionary, which is expected"
+    for key in x.keys():
+        assert key in ['image_reconstruction', 'logits'], f"x has not the correct keys {x.keys()}"
+    return x['logits']
+
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model_name = "SwiftNetRec"
@@ -116,4 +194,12 @@ if __name__ == "__main__":
 
     model = model.to(device)
     model.eval()
-    inference(model)
+    # inference(model)
+    model = ModelWrapper(model, postprocessing=remove_rec_output)
+    attack = generate_attack(10 / 255, model, attack_type="metzen", iterations=1)
+    sample = single_frame(model, sample=attack, inference=False)
+    out_attack, _ = attack.generate(sample)
+    out_attack = denormalize(out_attack)
+    cv2.imshow("Attacked image", out_attack)
+    cv2.waitKey(0) # wait for ay key to exit window
+    cv2.destroyAllWindows() # close all windows
