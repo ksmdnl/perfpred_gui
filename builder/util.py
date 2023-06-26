@@ -9,10 +9,8 @@ import cv2
 import sys
 import os
 from dataloader.definitions.labels_file import *
-from attack import Attack
+from .attack import Attack
 
-# TODO: this is ugly
-sys.path.append("../")
 from PerfPredRecV2.models.wrapper import load_model_def
 
 trainid2label = dataset_labels['cityscapes'].gettrainid2label()
@@ -198,9 +196,14 @@ if __name__ == "__main__":
     model = ModelWrapper(model, postprocessing=remove_rec_output)
     attack = generate_attack(10 / 255, model, attack_type="metzen", iterations=1)
     sample = single_frame(inference=False)
-    sample = denormalize(sample)
+    sample_og = denormalize(sample)
+    print(sample_og)
+    # cv2.imshow("Attacked image", sample_og)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
     out_attack, _ = attack.generate(sample)
-    out_attack = denormalize(out_attack)
-    cv2.imshow("Attacked image", out_attack)
-    cv2.waitKey(0) # wait for ay key to exit window
-    cv2.destroyAllWindows() # close all windows
+    print(out_attack)
+    # out_attack = denormalize(out_attack)
+    # cv2.imshow("Attacked image", out_attack)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()

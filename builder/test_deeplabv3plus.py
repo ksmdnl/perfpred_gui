@@ -1,6 +1,4 @@
 #!/usr/bin/env python
-
-# FIXME: this is ugly
 import numpy as np
 import torch
 import torchvision.transforms as transforms
@@ -9,7 +7,6 @@ import cv2
 import sys
 import os
 from dataloader.definitions.labels_file import *
-sys.path.append("../")
 from PerfPredRecV2.models.wrapper import load_model_def
 
 trainid2label = dataset_labels['cityscapes'].gettrainid2label()
