@@ -43,7 +43,6 @@ class Attack:
         return attack
 
     def _create_adversarial_attack(self, name):
-        # print(ATTACKS) #debugger
         module = importlib.import_module(ATTACKS[name].classpath)
         attack = getattr(module, ATTACKS[name].classname)
         return attack

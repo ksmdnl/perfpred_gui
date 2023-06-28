@@ -92,19 +92,3 @@ def inference(model):
                 break
     cap.release()
     cv2.destroyAllWindows()
-
-if __name__ == "__main__":
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # play()
-    model_name = "SwiftNet"
-    num_classes = 19
-    backbone = "resnet18"
-    model = load_model_def(model_name, num_classes)
-    weightspath = os.path.join("weights", model_name.lower(), backbone, 'model.pth')
-    assert os.path.exists(weightspath), f"{weightspath} does not exists."
-    model.load_state_dict(torch.load(weightspath, map_location=device))
-
-    model = model.to(device)
-    model.eval()
-    inference(model)
-    #single_frame(model)
