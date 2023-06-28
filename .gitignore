@@ -1,3 +1,6 @@
 .DS_Store
 builder/weights
 builder/videos
+TUBSRobustCheck/
+videos/
+*.pyc
