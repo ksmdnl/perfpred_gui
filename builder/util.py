@@ -162,10 +162,10 @@ def inference(model, path="builder/videos/tbilisi.mov"):
                 print(f"PSNR: {psnr} dB")
                 print(f"mIoU estimate: {get_miou_estimate(psnr)} %")
                 cv2.imshow("Reconstruction", reconstructed)
-                cv2.moveWindow("Reconstruction", 200, shift_window)
+                cv2.moveWindow("Reconstruction", 200, 200)
 
             cv2.imshow("Ground truth", frame)
-            cv2.moveWindow("Segmentation", 400, shift_window)
+            cv2.moveWindow("Segmentation", 400, 400)
             cv2.imshow("Segmentation", mask)
             
             if cv2.waitKey(1) & 0xFF == ord('q'):
