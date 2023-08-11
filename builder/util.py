@@ -113,9 +113,6 @@ def get_psnr(img, gen_img):
 def denormalize(tensor):
     return ((tensor * std) + mean).squeeze().permute(1,2,0).cpu().numpy()
 
-def display():
-    pass
-
 def play_images_as_video(directory):
     # Get the list of image filenames in the directory and sort them
     images = sorted(os.listdir(directory))
@@ -274,7 +271,6 @@ def compute_ate(gtruth_xyz, pred_xyz_o):
     rmse = np.sqrt(np.sum(alignment_error ** 2)) / gtruth_xyz.shape[0]
     return rmse
 
-
 class Evaluator(object):
     # CONF MATRIX
     #     0  1  2  (PRED)
@@ -347,7 +343,6 @@ class Evaluator(object):
         result = {'abs_rel': abs_rel, 'sq_rel': sq_rel, 'rmse': rmse, 'rmse_log': rmse_log}
         return result
 
-
 class SegmentationRunningScore(object):
     def __init__(self, n_classes):
         self.n_classes = n_classes
@@ -386,101 +381,6 @@ class SegmentationRunningScore(object):
 
     def reset(self):
         self.confusion_matrix = np.zeros((self.n_classes, self.n_classes))
-
-
-class DepthRunningScore(object):
-    def __init__(self):
-        self.num_samples = 0
-        self.depth_thresh = {'delta1': 0, 'delta2': 0, 'delta3': 0}
-        self.depth_errors = {'abs_rel': 0, 'sq_rel': 0, 'rmse': 0, 'rmse_log': 0}
-
-    def update(self, ground_truth, prediction):
-        if isinstance(ground_truth, list):
-            self.num_samples += len(ground_truth)
-        else:
-            ground_truth = [ground_truth]
-            prediction = [prediction]
-            self.num_samples += 1
-
-        for k in range(len(ground_truth)):
-            gt = ground_truth[k].astype(float)
-            pred = prediction[k].astype(float)
-            thresh = Evaluator.depththresh(gt, pred)
-            error = Evaluator.deptherror(gt, pred)
-            for i, j in zip(thresh.keys(), self.depth_thresh.keys()):
-                self.depth_thresh[i] += thresh[j]
-            for i, j in zip(error.keys(), self.depth_errors.keys()):
-                self.depth_errors[i] += error[j]
-
-    def get_scores(self, listofparams=None):
-        """Returns the evaluation params specified in the list"""
-        possibleparams = {
-            'thresh': self.depth_thresh,
-            'error': self.depth_errors,
-        }
-        if listofparams is None:
-            listofparams = possibleparams
-
-        result = {}
-        for param in listofparams:
-            if param in possibleparams.keys():
-                result.update(possibleparams[param])
-        for i in result.keys():
-            result[i] = result[i]/self.num_samples
-
-        return result
-
-    def reset(self):
-        self.num_samples = 0
-        self.depth_thresh = {'delta1': 0, 'delta2': 0, 'delta3': 0}
-        self.depth_errors = {'abs_rel': 0, 'sq_rel': 0, 'rmse': 0, 'rmse_log': 0}
-
-
-class PoseRunningScore(object):
-    def __init__(self):
-        self.preds = list()
-        self.gts = list()
-
-    def update(self, ground_truth, prediction):
-        if isinstance(ground_truth, list):
-            self.gts += ground_truth
-        else:
-            self.gts += [ground_truth]
-
-        if isinstance(prediction, list):
-            self.preds += prediction
-        else:
-            self.preds += [prediction]
-
-    def get_scores(self):
-        """Returns the evaluation params specified in the list"""
-
-        gt_global_poses = np.concatenate(self.gts)
-        pred_poses = np.concatenate(self.preds)
-
-        gt_global_poses = np.concatenate(
-            (gt_global_poses, np.zeros((gt_global_poses.shape[0], 1, 4))), 1)
-        gt_global_poses[:, 3, 3] = 1
-        gt_xyzs = gt_global_poses[:, :3, 3]
-        gt_local_poses = []
-        for i in range(1, len(gt_global_poses)):
-            gt_local_poses.append(
-                np.linalg.inv(np.dot(np.linalg.inv(gt_global_poses[i - 1]), gt_global_poses[i])))
-        ates = []
-        num_frames = gt_xyzs.shape[0]
-        track_length = 5
-        for i in range(0, num_frames - track_length + 1):
-            local_xyzs = np.array(dump_xyz(pred_poses[i:i + track_length - 1]))
-            gt_local_xyzs = np.array(dump_xyz(gt_local_poses[i:i + track_length - 1]))
-            ates.append(compute_ate(gt_local_xyzs, local_xyzs))
-
-        pose_error = {'mean': np.mean(ates), 'std': np.std(ates)}
-        return pose_error
-
-    def reset(self):
-        self.preds = list()
-        self.gts = list()
-
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
