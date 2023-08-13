@@ -243,34 +243,6 @@ def remove_rec_output(x):
     return x['logits']
 
 
-
-
-# from https://github.com/tinghuiz/SfMLearner
-def dump_xyz(source_to_target_transformations):
-    xyzs = []
-    cam_to_world = np.eye(4)
-    xyzs.append(cam_to_world[:3, 3])
-    for source_to_target_transformation in source_to_target_transformations:
-        cam_to_world = np.dot(cam_to_world, source_to_target_transformation)
-        xyzs.append(cam_to_world[:3, 3])
-    return xyzs
-
-
-# from https://github.com/tinghuiz/SfMLearner
-def compute_ate(gtruth_xyz, pred_xyz_o):
-
-    # Make sure that the first matched frames align (no need for rotational alignment as
-    # all the predicted/ground-truth snippets have been converted to use the same coordinate
-    # system with the first frame of the snippet being the origin).
-    offset = gtruth_xyz[0] - pred_xyz_o[0]
-    pred_xyz = pred_xyz_o + offset[None, :]
-
-    # Optimize the scaling factor
-    scale = np.sum(gtruth_xyz * pred_xyz) / np.sum(pred_xyz ** 2)
-    alignment_error = pred_xyz * scale - gtruth_xyz
-    rmse = np.sqrt(np.sum(alignment_error ** 2)) / gtruth_xyz.shape[0]
-    return rmse
-
 class Evaluator(object):
     # CONF MATRIX
     #     0  1  2  (PRED)
