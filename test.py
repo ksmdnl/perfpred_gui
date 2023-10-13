@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-import cv2
 import torch
 from builder.util import *
 
@@ -12,14 +11,8 @@ def iterate(dataset, model, metric, keys_to_load=['color', 'segmentation_trainid
             break
         seg_map = torch.argmax(output["logits"], dim=1).cpu().numpy()
         targets = targets.cpu().numpy()
-        print(seg_map.shape, type(seg_map))
-        print(targets.shape, type(targets))
         metric.update(targets, seg_map)
         miou = metric.get_scores()['meaniou']
-        print(miou)
-        # cv2.imshow("Semantic Segmentation", colored_targets)
-        # cv2.waitKey(0)
-        # cv2.destroyAllWindows()
 
 if __name__ == "__main__":
     path = "builder/videos/output/output_video.avi"
@@ -32,7 +25,7 @@ if __name__ == "__main__":
     )
     model = ModelWrapper(model, postprocessing=None)
 
-    # inference(model, path=path)
+    inference(model, path=path)
 
     from dataloader.pt_data_loader.specialdatasets import StandardDataset
     import dataloader.pt_data_loader.mytransforms as mytransforms
