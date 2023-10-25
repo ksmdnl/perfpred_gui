@@ -49,11 +49,6 @@ def load_model(model_name="SwiftNetRec",
     }
     print("Model is loaded with following parameters:")
 
-    # Show parameters
-    for k, v in config.items():
-        print(k, ":", v)
-    print("\n")
-
     # TODO: load_model_def using config dictionary
     model = load_model_def(model_name, num_class, rec_decoder=rec_decoder)
     if load_seg:
