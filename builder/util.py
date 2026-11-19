@@ -1,16 +1,21 @@
 #!/usr/bin/env python
 import os
+from pathlib import Path
+import json
 import cv2
 import warnings
+import importlib
+
 import numpy as np
 import torch
 import torch.nn as nn
 import torchvision.transforms as transforms
 
-from .attack import attack
+from robustness.attacks import ATTACKS
+from robustness.corruptions import CORRUPTIONS
 from dataloader.definitions.labels_file import *
 
-from PerfPredRecV2.models.wrapper import load_model_def
+from PerfPredRecV2.eval.model_architectures import load_model_def
 
 trainid2label = dataset_labels['cityscapes'].gettrainid2label()
 
@@ -19,10 +24,12 @@ STD = [0.229, 0.224, 0.225]
 mean = torch.tensor(MEAN).reshape(1, -1, 1, 1)
 std = torch.tensor(STD).reshape(1, -1, 1, 1)
 
-HEIGHT, WIDTH = 150, 500
+factor = 1
+HEIGHT, WIDTH = int(150 * factor), int(500 * factor)
+# HEIGHT, WIDTH = 300, 1000
 preprocess = transforms.Compose([
     transforms.ToPILImage(),
-    transforms.Resize((HEIGHT, WIDTH)),
+    # transforms.Resize((HEIGHT, WIDTH)),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
 )
@@ -31,38 +38,37 @@ reg_coeff = np.array([0.09334191 -0.6773528  -9.46617536])
 
 # TODO: make an object of this
 # so that it can become more flexible
-def load_model(model_name="SwiftNetRec",
-    backbone="resnet18",
-    rec_decoder="swiftnet",
+def load_model(
+    weights_path: str,
     num_class=19,                           # Cityscapes
-    load_seg=False,
+    load_pretrained=True,
     device=torch.device('cpu'),
-    dataset='cityscapes',
-):
-    config = {
-        'name': model_name,
-        'backbone': backbone,
-        'decoder': rec_decoder,
-        'trained': load_seg,
-        'num_classes': num_class,
-        'dataset': dataset,
-    }
-    print("Model is loaded with following parameters:")
+) -> nn.Module:
 
-    # TODO: load_model_def using config dictionary
-    model = load_model_def(model_name, num_class, rec_decoder=rec_decoder)
-    if load_seg:
-        weightspath = os.path.join("builder/weights", model_name.lower(), backbone, 'model.pth')
-        assert os.path.exists(weightspath), f"{weightspath} does not exists."
-        model.load_state_dict(torch.load(weightspath, map_location=device))
-        print("\nSegmentation weights are sucessfully loaded!")
+    cfg_path = os.path.join(weights_path, "models", "opt.json")
+    with open(cfg_path, "r", encoding="utf-8") as f:
+        cfg = json.load(f)
+
+    model = load_model_def(
+        cfg["model_name"],
+        num_class,
+        backbone=cfg["encoder"],
+        rec_decoder=cfg["rec_decoder"]
+    )
+
+    if load_pretrained:
+        dict_path = [str(p) for p in Path(weights_path).rglob("*.pth")][0]
+        model.load_state_dict(torch.load(dict_path, map_location=device))
+        print("\nSegmentation weights are sucessfully loaded.")
+    else:
+        print("\nModel instantiated with random weights.")
 
     model = model.to(device)
     model.eval()
     return model
 
 def get_miou_estimate(psnr):
-    return 0.09334191 * (psnr**2) - 0.6773528 * psnr - 9.46617536
+    return 0.09334191 * (psnr**2) - 0.6773528 * psnr + 9.46617536
 
 def colorize(tensor, num_classes=19):
     new_tensor = torch.zeros((tensor.shape[0], tensor.shape[1], 3), dtype=torch.uint8)
@@ -133,6 +139,19 @@ def play_images_as_video(directory):
     output_video.release()
     cv2.destroyAllWindows()
 
+attack_name = "metzen"
+attack = ATTACKS
+module = importlib.import_module(ATTACKS[attack_name].classpath)
+attack = getattr(module, ATTACKS[attack_name].classname)
+attack = attack(epsilon=10 / 255, alpha=1 / 255, iterations=60, target_type='dynamic')
+attack.show_parameters()
+
+corruption_name = 'gaussian_noise'
+corruptions = CORRUPTIONS
+module = importlib.import_module(CORRUPTIONS[corruption_name].classpath)
+corruption = getattr(module, CORRUPTIONS[corruption_name].classname)
+corruption = corruption()
+
 def inference(model, path="builder/videos/tbilisi.mov"):
     cap = cv2.VideoCapture(path)
     with torch.no_grad():
@@ -140,13 +159,20 @@ def inference(model, path="builder/videos/tbilisi.mov"):
             ret, frame = cap.read()
             if not ret:
                 break
-            frame = cv2.resize(frame, (WIDTH, HEIGHT)) 
+            # frame = cv2.resize(frame, (WIDTH, HEIGHT)) 
             # Preprocess the frame
             input_tensor = preprocess(frame).unsqueeze(0)
+            # input_tensor = corruption(input_tensor, 4).float()
             
             # Perform inference
             output = model(input_tensor)
+            attack(input_tensor, model.model)
+            breakpoint()
+            # breakpoint()
             output = postprocess(output)
+            # for out in output:
+            #     print(out.shape)
+            # breakpoint()
             mask = output[0]
             if output[1] is not None:
                 reconstructed = output[1]
@@ -201,6 +227,12 @@ class ModelWrapper(nn.Module):
         self.postprocessing = postprocessing
         self.device = next(model.parameters()).device
 
+    def _remove_rec_output(self, x):
+        assert isinstance(x, dict), "x is not a dictionary, which is expected"
+        for key in x.keys():
+            assert key in ['image_reconstruction', 'logits'], f"x has not the correct keys {x.keys()}"
+        return x['logits']
+
     def _preprocess(self, x):
         """
         A function to perform preprocessing on the model input.
@@ -220,6 +252,7 @@ class ModelWrapper(nn.Module):
         :param y: Output of the model.
         :return: Postprocessed output
         """
+        # return self.remove_rec_output(y)
         if self.postprocessing is None:
             return y
         else:
@@ -230,13 +263,9 @@ class ModelWrapper(nn.Module):
         y = self.model(x)
         return self._postprocess(y)
 
-
-def remove_rec_output(x):
-    assert isinstance(x, dict), "x is not a dictionary, which is expected"
-    for key in x.keys():
-        assert key in ['image_reconstruction', 'logits'], f"x has not the correct keys {x.keys()}"
-    return x['logits']
-
+    def remove_rec_output(self, x):
+        assert isinstance(x, dict), "x is not a dictionary, which is expected"
+        return x['logits']
 
 class Evaluator(object):
     # CONF MATRIX

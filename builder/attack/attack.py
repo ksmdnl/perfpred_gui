@@ -9,7 +9,7 @@ import torch
 # TODO: this ugly
 import sys
 sys.path.append('../')
-from TUBSRobustCheck.robustness.attacks import ATTACKS
+from robustness.attacks import ATTACKS
 
 class Attack:
     SUPPORTED_ATTACKS = ["fgsm", "llcm", "metzen", "metzen_uap", "pgd"]
