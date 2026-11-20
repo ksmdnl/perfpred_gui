@@ -85,7 +85,7 @@ attack = attack(
     width=WIDTH
 )
 
-def inference(model, path="builder/videos/tbilisi.mov"):
+def run_inference(model, path="builder/videos/tbilisi.mov"):
     cap = cv2.VideoCapture(path)
     while cap.isOpened():
         ret, frame = cap.read()

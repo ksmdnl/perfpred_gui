@@ -3,7 +3,7 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 import os
-from builder.util import inference
+from builder.inference import run_inference
 from PerfPredRecV2.eval.model_architectures import load_model_def
 
 # How many attributes each domain has
