@@ -105,14 +105,8 @@ class ModelWrapper(nn.Module):
         assert isinstance(x, dict), "x is not a dictionary, which is expected"
         return x['logits']
 
-if __name__ == "__main__":
-    # path = "./samples/cs_sec_101.mp4"
-    path = "./samples/stuttgart_00.mp4"
-    domain = "cityscapes"
-    # <SEGMENTATION_ARCH>_<BACKBONE_ARCH>
-    model_name = "swiftnetrec_rn50"
+def main(sample_path: str, model_name: str, domain: str) -> None:
     weights_path = os.path.join("weights", model_name)
-    seg_arch, backbone_arc = model_name.split("_")
     num_class = CLASS[domain]
 
     assert os.path.exists(weights_path), f"Path does not exist."
@@ -126,4 +120,17 @@ if __name__ == "__main__":
 
     model = ModelWrapper(model, postprocessing=None)
 
-    inference(model, path=path)
+    run_inference(model, path=sample_path)
+    return 0
+
+if __name__ == "__main__":
+    # Path to a sample video
+    sample_path = "./samples/stuttgart_00.mp4"
+
+    # Domain class is Cityscape as default: 19 classes
+    domain = "cityscapes"
+
+    # <SEGMENTATION_ARCH>_<BACKBONE_ARCH>
+    model_name = "swiftnetrec_rn50"
+
+    main(sample_path, model_name, domain)
