@@ -4,3 +4,8 @@ builder/videos
 TUBSRobustCheck/
 videos/
 *.pyc
+samples/
+weights/
+.vscode/
+*.mp4
+*.pkl
