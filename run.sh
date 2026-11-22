@@ -1,2 +1,1 @@
-export PYTHONPATH=$PYTHONPATH:/Users/dkusuma/Work/prototypes/perfpred_gui/PerfPredRecV2
-python run.py
+PYTHONPATH=$PYTHONPATH:/Users/dkusuma/Work/prototypes/perfpred_gui/PerfPredRecV2 RESIZE=True python run.py
